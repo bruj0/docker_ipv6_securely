@@ -14,19 +14,19 @@
 ![Diagram](images/Docker&#32;IPv6&#32;Securely.png)
 ## Objectives 
 * Automatic provisioning of IPv6
-   * Each Docker container will receive an IPv6 automaticaly.
+   * Each Docker container will receive an IPv6 automatically.
 * Secured public access to our containers via IPv6.
-   * They will be rechable publicly so we want to be able to whitelist open ports in a secure way.
+   * They will be reachable publicly so we want to be able to whitelist open ports in a secure way.
 * Out of band Firewall
-   * Having an out of band firewall, meaning outside of the VM, will increases the security of the system
+   * Having an out of band firewall, meaning outside of the VM, will increase the security of the system
 ## Requirements
 ### IPv6 network
-For this articule we will use a /64 IPv6 network because its what our Hosting privider (Hetzner) gives us.
+For this article, we will use a /64 IPv6 network because its what our Hosting provider (Hetzner) gives us.
 
 This will be divided in /80 subnets, one for each VM containing Docker containers for a total of 65536.
 
 ## Hypervisor
-We will need a way to provision VMs, for this articule we selected Proxmox
+We will need a way to provision VMs, for this article we selected Proxmox
 More information: 
 * https://www.proxmox.com/en/proxmox-ve/get-started
 * How to install it remotely on any server: https://www.linkedin.com/pulse/installing-any-os-headless-server-rodrigo-leven/
@@ -42,7 +42,7 @@ We will create 3 bridges:
 
 ![Bridges](images/bridges.png)
 ## Firewall (pfSense)
-We will need an out of band Firewall to be able to whitelist open ports and for this we are going to use pfSense.
+We will need an out of band Firewall to be able to whitelist open ports and for this, we are going to use pfSense.
 
 More information here: https://docs.netgate.com/pfsense/en/latest/virtualization/virtualizing-pfsense-with-proxmox.html
 
@@ -52,9 +52,9 @@ We will add 3 network cards and configure each one to one of the Bridges we crea
 
 ### Interfaces assignments in pfSense
 We will configure 3 interfaces and a bridge:
-* **WAN:** The IPv4 that we will use to NAT and portfoward to our VMs
+* **WAN:** The IPv4 that we will use to NAT and port forward to our VMs
   * xxx.xxx.45.134
-* **LAN:** The Internal network facing interface and default gateway for IPv4
+* **LAN:** The Internal network-facing interface and default gateway for IPv4
   * 10.10.10.2
 * **WAN6:** The default gateway for our IPv6 network
   * Static IPv6: xxxx:yyyy:ww:321d::2
@@ -66,7 +66,7 @@ We will configure 3 interfaces and a bridge:
 
 ### pFsense Bridge
 
-Out hosting provider requires that our IPv6 traffic comes from the the a MAC address associated to our IPv4:
+Out hosting provider requires that our IPv6 traffic comes from the same MAC address associated with our IPv4:
 
 ![pfSense bridge](images/hetzner_ipv6.png)
 
@@ -79,7 +79,7 @@ We need to create the following firewall rules:
 * **WAN:**
   * ANY to our IPv6 /80
   * ANY to our IPv6/ports we want to be public
-  * From WAN6 to ANY (out going traffic)
+  * From WAN6 to ANY (outgoing traffic)
 
 * **WAN6:**
   * Protocol IPv6 to WAN6 (outgoing traffic)
@@ -88,7 +88,7 @@ We need to create the following firewall rules:
 In this example we use systemd-networkd but the same idea can be used on any network manager.
 https://wiki.archlinux.org/index.php/Systemd-networkd
 
-Notice we use ::3 for our VM IPv6 and no default gateway because this will be configured in the docker0 bridge.
+Notice we use::3 for our VM IPv6 and no default gateway because this will be configured in the docker0 bridge.
 
 ```
 [Match]
@@ -122,7 +122,7 @@ PING www.google.com(ams16s29-in-x04.1e100.net (2a00:1450:400e:804::2004)) 56 dat
 ### Docker configuration
 More information: https://docs.docker.com/v17.09/engine/userguide/networking/default_network/ipv6/#routed-network-environment
 
-We configure docker to ouse our /80 subnet under :0001::/80 and as default gateway WAN6 from pFsense.
+We configure docker to use our /80 subnets under :0001::/80 and as default gateway WAN6 from pFsense.
 
 ```
 # cat /etc/docker/daemon.json 
@@ -138,9 +138,9 @@ https://docs.docker.com/v17.09/engine/userguide/networking/default_network/build
 
 ```
 # brctl show
-bridge name	bridge id		STP enabled	interfaces
-docker0		8000.024206f98e86	no		eth1
-							vethb0f16cc
+bridge name    bridge id        STP enabled    interfaces
+docker0        8000.024206f98e86    no        eth1
+                            vethb0f16cc
 
 ```
 And make sure our default route goes trough docker0 **not** eth1
@@ -187,5 +187,5 @@ PING www.google.com (2a00:1450:400e:807::2004): 56 data bytes
 
 ```
 
-From here we can see we got IPv4 172.17.0.2/16 and IPv6 xxxx:yyyy:ww:321d:1:242:ac11:2/80 and a ping with IPv6 works.
+From here we can see we got IPv4 172.17.0.2/16 and IPv6 xxxx:yyyy:ww:321d:1:242:ac11:2/80 and ping with IPv6 works.
 
