@@ -57,7 +57,7 @@ We will configure 3 interfaces and a bridge:
 * **LAN:** The Internal network facing interface and default gateway for IPv4
   * 10.10.10.2
 * **WAN6:** The default gateway for our IPv6 network
-  * Static IPv6: xxxx:yyyy:2a:321d::2
+  * Static IPv6: xxxx:yyyy:ww:321d::2
   * Default gateway: fe80::1 (required for our hosting provider)
 
 ![pfSense](images/pfsense_interfaces2.png)
@@ -95,7 +95,7 @@ Notice we use ::3 for our VM IPv6 and no default gateway because this will be co
 Name=eth1
 
 [Network]
-Address=2a01:4f9:2a:321d::3/64
+Address=xxxx:yyyy:ww:321d::3/64
 ```
 
 This will give us 2 IPv6:
@@ -103,7 +103,7 @@ This will give us 2 IPv6:
 ```
 # ip -6 addr show dev eth1
 3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master docker0 state UP group default qlen 1000
-    inet6 2a01:4f9:2a:321d::3/64 scope global 
+    inet6 xxxx:yyyy:ww:321d::3/64 scope global 
        valid_lft forever preferred_lft forever
     inet6 fe80::e470:c4ff:fe34:1491/64 scope link 
        valid_lft forever preferred_lft forever
