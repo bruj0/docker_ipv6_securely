@@ -1,32 +1,31 @@
-- [1. Docker and IPv6 Securely](#1-docker-and-ipv6-securely)
-  - [1.1. Diagram](#11-diagram)
-  - [1.2. Objectives](#12-objectives)
-    - [1.2.1. Automatic provisioning of IPv6](#121-automatic-provisioning-of-ipv6)
-    - [1.2.2. Security](#122-security)
-      - [1.2.2.1. Out of band Firewall](#1221-out-of-band-firewall)
-  - [1.3. Requirements](#13-requirements)
-  - [1.4. Hypervisor](#14-hypervisor)
-  - [1.5. IPv6 network](#15-ipv6-network)
-  - [1.6. Bridges](#16-bridges)
-  - [1.7. Firewall (pfSense)](#17-firewall-pfsense)
-    - [1.7.1. Interfaces assignments in pfSense](#171-interfaces-assignments-in-pfsense)
-  - [1.8. pFsense Bridge](#18-pfsense-bridge)
-  - [1.9. Firewall Rules](#19-firewall-rules)
-  - [1.10. VM configuration](#110-vm-configuration)
-  - [1.11. Docker configuration](#111-docker-configuration)
-
-# 1. Docker and IPv6 Securely
-## 1.1. Diagram
+- [Diagram](#diagram)
+- [Objectives](#objectives)
+- [Requirements](#requirements)
+  - [IPv6 network](#ipv6-network)
+- [Hypervisor](#hypervisor)
+  - [Bridges](#bridges)
+- [Firewall (pfSense)](#firewall-pfsense)
+  - [Interfaces assignments in pfSense](#interfaces-assignments-in-pfsense)
+  - [pFsense Bridge](#pfsense-bridge)
+  - [Firewall Rules](#firewall-rules)
+- [VM configuration](#vm-configuration)
+  - [Docker configuration](#docker-configuration)
+## Diagram
 ![Diagram](images/Docker&#32;IPv6&#32;Securely.png)
-## 1.2. Objectives 
-### 1.2.1. Automatic provisioning of IPv6
-Each Docker container will receive an IPv6 automaticaly.
-### 1.2.2. Security
-They will be rechable publicly so we want to be able to whitelist open ports in a secure way.
-#### 1.2.2.1. Out of band Firewall
-Having an out of band firewall, meaning outside of the VM, will increases the security of the system
-## 1.3. Requirements
-## 1.4. Hypervisor
+## Objectives 
+* Automatic provisioning of IPv6
+   * Each Docker container will receive an IPv6 automaticaly.
+* Secured public access to our containers via IPv6.
+   * They will be rechable publicly so we want to be able to whitelist open ports in a secure way.
+* Out of band Firewall
+   * Having an out of band firewall, meaning outside of the VM, will increases the security of the system
+## Requirements
+### IPv6 network
+For this articule we will use a /64 IPv6 network because its what our Hosting privider (Hetzner) gives us.
+
+This will be divided in /80 subnets, one for each VM containing Docker containers for a total of 65536.
+
+## Hypervisor
 We will need a way to provision VMs, for this articule we selected Proxmox
 More information: 
 * https://www.proxmox.com/en/proxmox-ve/get-started
@@ -34,18 +33,15 @@ More information:
 
 ![Proxmox](images/proxmox.png)
 
-## 1.5. IPv6 network
-For this articule we will use a /64 IPv6 network because its what our Hosting privider (Hetzner) gives us.
 
-This will be divided in /80 subnets, one for each VM containing Docker containers for a total of 65536.
-## 1.6. Bridges
+### Bridges
 We will create 3 bridges:
 * **vmbr0**: It will connect to the internet and receive both IPv4 and IPv6 traffic.
 * **vmbr1**: The internal network shared between VMs, 10.x.x.x
 * **vmbr2**: This bridge will hold the IPv6 network for our VMs
 
 ![Bridges](images/bridges.png)
-## 1.7. Firewall (pfSense)
+## Firewall (pfSense)
 We will need an out of band Firewall to be able to whitelist open ports and for this we are going to use pfSense.
 
 More information here: https://docs.netgate.com/pfsense/en/latest/virtualization/virtualizing-pfsense-with-proxmox.html
@@ -54,7 +50,7 @@ We will add 3 network cards and configure each one to one of the Bridges we crea
 
 ![pfSense](images/pfsense.png)
 
-### 1.7.1. Interfaces assignments in pfSense
+### Interfaces assignments in pfSense
 We will configure 3 interfaces and a bridge:
 * **WAN:** The IPv4 that we will use to NAT and portfoward to our VMs
   * xxx.xxx.45.134
@@ -68,7 +64,7 @@ We will configure 3 interfaces and a bridge:
 
 ![pfSense](images/pfsense_interfaces.png)
 
-## 1.8. pFsense Bridge
+### pFsense Bridge
 
 Out hosting provider requires that our IPv6 traffic comes from the the a MAC address associated to our IPv4:
 
@@ -78,7 +74,7 @@ This means we have to bridge our WAN (ipv4) and WAN6 (ipv6) together:
 
 ![pfSense bridge](images/pfsense_bridge.png)
 
-## 1.9. Firewall Rules
+### Firewall Rules
 We need to create the following firewall rules:
 * **WAN:**
   * ANY to our IPv6 /80
@@ -88,7 +84,7 @@ We need to create the following firewall rules:
 * **WAN6:**
   * Protocol IPv6 to WAN6 (outgoing traffic)
 
-## 1.10. VM configuration
+## VM configuration
 In this example we use systemd-networkd but the same idea can be used on any network manager.
 https://wiki.archlinux.org/index.php/Systemd-networkd
 
@@ -123,7 +119,7 @@ PING www.google.com(ams16s29-in-x04.1e100.net (2a00:1450:400e:804::2004)) 56 dat
 64 bytes from ams16s29-in-x04.1e100.net (2a00:1450:400e:804::2004): icmp_seq=3 ttl=55 time=32.4 ms
 ```
 
-## 1.11. Docker configuration
+### Docker configuration
 More information: https://docs.docker.com/v17.09/engine/userguide/networking/default_network/ipv6/#routed-network-environment
 
 We configure docker to ouse our /80 subnet under :0001::/80 and as default gateway WAN6 from pFsense.
