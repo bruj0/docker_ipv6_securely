@@ -29,13 +29,13 @@
 ### IPv6 network
 For this article, we will use a /64 IPv6 network because its what our Hosting provider (Hetzner) gives us.
 This will be divided in 4096 /76s:
-* z: x:y:321d:10::1/76 WAN in Pfsense
-* z: x:y:321d:20::1/76 VIP gateway for VM1
-  * z: x:y:321d:20:**1**::1/80 for Docker containers in VM1
-* z: x:y:321d::30:1/76 VIP gateway for VM2
-  * z: x:y:321d:30:**1**::1/80 for Docker containers in VM1
-* z: x:y:321d:3e80::1/76 VMx
-  * z: x:y:321d:30:**1**::1/80 for Docker containers in VMx
+* z: x:y:w:10::1/76 WAN in Pfsense
+* z: x:y:w:20::1/76 VIP gateway for VM1
+  * z: x:y:w:20:**1**::1/80 for Docker containers in VM1
+* z: x:y:w::30:1/76 VIP gateway for VM2
+  * z: x:y:w:30:**1**::1/80 for Docker containers in VM1
+* z: x:y:w:3e80::1/76 VMx
+  * z: x:y:w:30:**1**::1/80 for Docker containers in VMx
 
 ## Hypervisor
 We will need a way to provision VMs, for this article we selected Proxmox
@@ -169,7 +169,7 @@ Test it by using an alpine container:
 / # ip -6 route
 z:x:y:w:21::/80 dev eth0  metric 256 
 fe80::/64 dev eth0  metric 256 
-default via 2a01:4f9:2a:321d:21::1 dev eth0  metric 1024 
+default via z:x:y:w:21::1 dev eth0  metric 1024 
 ff00::/8 dev eth0  metric 256 
 
 / # ip -6 addr
