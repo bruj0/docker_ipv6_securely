@@ -31,11 +31,11 @@ For this article, we will use a /64 IPv6 network because its what our Hosting pr
 This will be divided in 4096 /76s:
 * z: x:y:w:10::1/76 WAN in Pfsense
 * z: x:y:w:20::1/76 VIP gateway for VM1
-  * z: x:y:w:20:**1**::1/80 for Docker containers in VM1
+  * z: x:y:w:21::/80 for Docker containers in VM1
 * z: x:y:w::30:1/76 VIP gateway for VM2
-  * z: x:y:w:30:**1**::1/80 for Docker containers in VM1
+  * z: x:y:w:31::1/80 for Docker containers in VM2
 * z: x:y:w:3e80::1/76 VMx
-  * z: x:y:w:30:**1**::1/80 for Docker containers in VMx
+  * z: x:y:w:3e81::1/80 for Docker containers in VMx
 
 ## Hypervisor
 We will need a way to provision VMs, for this article we selected Proxmox
