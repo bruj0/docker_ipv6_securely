@@ -6,7 +6,10 @@
   - [Bridges](#bridges)
 - [Firewall (pfSense)](#firewall-pfsense)
   - [Interfaces assignments in pfSense](#interfaces-assignments-in-pfsense)
-  - [pFsense Bridge](#pfsense-bridge)
+    - [IPv4](#ipv4)
+    - [IPv6](#ipv6)
+  - [Routing in pfSense](#routing-in-pfsense)
+  - [MAC assignment for IPv6](#mac-assignment-for-ipv6)
   - [Firewall Rules](#firewall-rules)
 - [VM configuration](#vm-configuration)
   - [Docker configuration](#docker-configuration)
@@ -15,15 +18,24 @@
 ## Objectives 
 * Automatic provisioning of IPv6
    * Each Docker container will receive an IPv6 automatically.
+* Routed IPv6 traffic between container in different Hosts
+   * Each host will have a /80 that will be routed trough pfSense 
 * Secured public access to our containers via IPv6.
    * They will be reachable publicly so we want to be able to whitelist open ports in a secure way.
 * Out of band Firewall
    * Having an out of band firewall, meaning outside of the VM, will increase the security of the system
+   * 
 ## Requirements
 ### IPv6 network
 For this article, we will use a /64 IPv6 network because its what our Hosting provider (Hetzner) gives us.
-
-This will be divided in /80 subnets, one for each VM containing Docker containers for a total of 65536.
+This will be divided in 4096 /76s:
+* z: x:y:321d:10::1/76 WAN in Pfsense
+* z: x:y:321d:20::1/76 VIP gateway for VM1
+  * z: x:y:321d:20:**1**::1/80 for Docker containers in VM1
+* z: x:y:321d::30:1/76 VIP gateway for VM2
+  * z: x:y:321d:30:**1**::1/80 for Docker containers in VM1
+* z: x:y:321d:3e80::1/76 VMx
+  * z: x:y:321d:30:**1**::1/80 for Docker containers in VMx
 
 ## Hypervisor
 We will need a way to provision VMs, for this article we selected Proxmox
@@ -36,14 +48,14 @@ More information:
 
 ### Bridges
 We will create 3 bridges:
-* **vmbr0**: It will connect to the internet and receive both IPv4 and IPv6 traffic.
+* **vmbr0**: It will connect to the internet and receive both IPv4 and IPv6 traffic but will only have the main IPv4 assigned xxx.yyy.145.162/26
 * **vmbr1**: The internal network shared between VMs, 10.x.x.x
-* **vmbr2**: This bridge will hold the IPv6 network for our VMs
+* **vmbr2**: This bridge will hold the IPv6 network for our VMs, in this case a /64
 
 ![Bridges](images/bridges.png)
 ## Firewall (pfSense)
 We will need an out of band Firewall to be able to whitelist open ports and for this, we are going to use pfSense.
-
+ 
 More information here: https://docs.netgate.com/pfsense/en/latest/virtualization/virtualizing-pfsense-with-proxmox.html
 
 We will add 3 network cards and configure each one to one of the Bridges we created before
@@ -51,28 +63,40 @@ We will add 3 network cards and configure each one to one of the Bridges we crea
 ![pfSense](images/pfsense.png)
 
 ### Interfaces assignments in pfSense
-We will configure 3 interfaces and a bridge:
-* **WAN:** The IPv4 that we will use to NAT and port forward to our VMs
-  * xxx.xxx.45.134
-* **LAN:** The Internal network-facing interface and default gateway for IPv4
-  * 10.10.10.2
-* **WAN6:** The default gateway for our IPv6 network
-  * Static IPv6: xxxx:yyyy:ww:321d::2
-  * Default gateway: fe80::1 (required for our hosting provider)
-
 ![pfSense](images/pfsense_interfaces2.png)
+#### IPv4
+* WAN NAT IPv4: xxx.yyy.145.136/26
+* WAN NAT IPv6: z: x:y:w:10::1/76
+* LAN 10.10.10.2
 
-![pfSense](images/pfsense_interfaces.png)
+We have 2 IPv4 assigned , one to access the Host KVM and other to use as NAT and the internal LAN.
+#### IPv6
+Default gateways for the VM hosts.
+* WAN6 z: x:y:w:20::1
+  * VIP z: x:y:w:30::1
+  ...
+  * VIP z: x:y:w:3e80::1
 
-### pFsense Bridge
 
-Out hosting provider requires that our IPv6 traffic comes from the same MAC address associated with our IPv4:
+### Routing in pfSense
+
+The default GW for IPv6 is fe80::1 for the interface IPv6 and the corresponding ::1/80 for the hosts.
+
+Each VM host gets a static route so we define as a gateway the IPv6 of the host, 20::2
+
+![pfSense bridge](images/pfsense_gateways.png)
+
+Then we add a static route saying that our container subnet 21::/80 can be reached the interface WAN6 via the host 20::2.
+
+![pfSense bridge](images/pfsense_static_routes.png)
+
+
+### MAC assignment for IPv6
+
+Our hosting provider requires that our IPv6 traffic comes from the same MAC address associated with one of our IPv4:
 
 ![pfSense bridge](images/hetzner_ipv6.png)
 
-This means we have to bridge our WAN (ipv4) and WAN6 (ipv6) together:
-
-![pfSense bridge](images/pfsense_bridge.png)
 
 ### Firewall Rules
 We need to create the following firewall rules:
@@ -88,25 +112,31 @@ We need to create the following firewall rules:
 In this example we use systemd-networkd but the same idea can be used on any network manager.
 https://wiki.archlinux.org/index.php/Systemd-networkd
 
-Notice we use::3 for our VM IPv6 and no default gateway because this will be configured in the docker0 bridge.
+Notice we use ::2 for our VM IPv6 and WAN6 interface IP as a default route.
 
 ```
 [Match]
 Name=eth1
 
 [Network]
-Address=xxxx:yyyy:ww:321d::3/64
+Address=z:x:y:w:20::2/80
+Gateway=z:x:y:w:20::1
+
+[Route]
+Gateway=z:x:y:w:20::1
+
 ```
 
-This will give us 2 IPv6:
+This will give us:
 
 ```
 # ip -6 addr show dev eth1
 3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master docker0 state UP group default qlen 1000
-    inet6 xxxx:yyyy:ww:321d::3/64 scope global 
+    inet6 z:x:y:w:20::2/76 scope global 
        valid_lft forever preferred_lft forever
     inet6 fe80::e470:c4ff:fe34:1491/64 scope link 
        valid_lft forever preferred_lft forever
+
 
 ```
 
@@ -122,64 +152,36 @@ PING www.google.com(ams16s29-in-x04.1e100.net (2a00:1450:400e:804::2004)) 56 dat
 ### Docker configuration
 More information: https://docs.docker.com/v17.09/engine/userguide/networking/default_network/ipv6/#routed-network-environment
 
-We configure docker to use our /80 subnets under :0001::/80 and as default gateway WAN6 from pFsense.
+We configure docker to use our /80 subnets under 21::/80.
 
 ```
 # cat /etc/docker/daemon.json 
 {
   "ipv6": true,
-  "fixed-cidr-v6": "xxxx:yyyy:ww:321d:0001::/80",
-  "default-gateway-v6": "xxxx:yyyy:ww:321d:0001::2"
+  "fixed-cidr-v6": "z:x:y:w:21::/80"
 }
 ```
-
-We will also need to create our own bridge, adding eth1 and the containers interfaces:
-https://docs.docker.com/v17.09/engine/userguide/networking/default_network/build-bridges/
-
-```
-# brctl show
-bridge name    bridge id        STP enabled    interfaces
-docker0        8000.024206f98e86    no        eth1
-                            vethb0f16cc
-
-```
-And make sure our default route goes trough docker0 **not** eth1
-
-```
-# ip -6 route
-::1 dev lo proto kernel metric 256 pref medium
-xxxx:yyyy:ww:321d::/80 dev docker0 metric 1024 pref medium
-xxxx:yyyy:ww:321d:1::/80 dev docker0 proto kernel metric 256 pref medium
-xxxx:yyyy:ww:321d:1::/80 dev docker0 metric 1024 pref medium
-xxxx:yyyy:ww:321d::/64 dev eth1 proto kernel metric 256 pref medium
-default via xxxx:yyyy:ww:321d::2 dev docker0 metric 1024 pref medium
 
 ```
 Test it by using an alpine container:
 
-docker run -it alpine ash
-
-```
+# docker run -it alpine ash
 / # ip -6 route
-xxxx:yyyy:ww:321d:1::/80 dev eth0  metric 256 
+z:x:y:w:21::/80 dev eth0  metric 256 
 fe80::/64 dev eth0  metric 256 
-default via xxxx:yyyy:ww:321d:1::2 dev eth0  metric 1024 
+default via 2a01:4f9:2a:321d:21::1 dev eth0  metric 1024 
 ff00::/8 dev eth0  metric 256 
+
 / # ip -6 addr
-13: eth0@if14: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 state UP 
-    inet6 xxxx:yyyy:ww:321d:1:242:ac11:2/80 scope global flags 02 
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN qlen 1000
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+43: eth0@if44: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 state UP 
+    inet6 z:x:y:w:21:242:ac11:2/80 scope global flags 02 
        valid_lft forever preferred_lft forever
     inet6 fe80::42:acff:fe11:2/64 scope link 
        valid_lft forever preferred_lft forever
-/ # ip  addr
-13: eth0@if14: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue state UP 
-    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
-    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
-       valid_lft forever preferred_lft forever
-    inet6 xxxx:yyyy:ww:321d:1:242:ac11:2/80 scope global flags 02 
-       valid_lft forever preferred_lft forever
-    inet6 fe80::42:acff:fe11:2/64 scope link 
-       valid_lft forever preferred_lft forever
+
 / # ping -6 www.google.com
 PING www.google.com (2a00:1450:400e:807::2004): 56 data bytes
 64 bytes from 2a00:1450:400e:807::2004: seq=0 ttl=55 time=26.828 ms
@@ -187,5 +189,5 @@ PING www.google.com (2a00:1450:400e:807::2004): 56 data bytes
 
 ```
 
-From here we can see we got IPv4 172.17.0.2/16 and IPv6 xxxx:yyyy:ww:321d:1:242:ac11:2/80 and ping with IPv6 works.
+From here we can see we got IPv4 172.17.0.2/16 and IPv6 z:x:y:w:21:242:ac11:2/80 and ping with IPv6 works.
 
