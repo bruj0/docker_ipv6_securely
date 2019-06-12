@@ -30,7 +30,7 @@
 For this article, we will use a /64 IPv6 network because its what our Hosting provider (Hetzner) gives us.
 This will be divided in 4096 /76s:
 * z: x:y:w:10::1/76 WAN in Pfsense
-* z: x:y:w:20::1/76 VIP gateway for VM1
+* z: x:y:w:20::1/76 VIP (or WAN6) gateway for VM1
   * z: x:y:w:21::/80 for Docker containers in VM1
 * z: x:y:w::30:1/76 VIP gateway for VM2
   * z: x:y:w:31::1/80 for Docker containers in VM2
@@ -80,20 +80,21 @@ Default gateways for the VM hosts.
 
 ### Routing in pfSense
 
-The default GW for IPv6 is fe80::1 for the interface IPv6 and the corresponding ::1/80 for the hosts.
+The default GW for IPv6 is fe80::1 trough the WAN interface (not WAN6) this is because this interface is connected to the KVM bridge that has access to the connection to the internet.
 
-Each VM host gets a static route so we define as a gateway the IPv6 of the host, 20::2
+Each Docker network in the VM host gets a static route so they can comunicate between each other.
+For this we need to define a Gateway  as z:x:y:w:20::2 trough the WAN6 interface called "vm1" in the picture.
 
 ![pfSense bridge](images/pfsense_gateways.png)
 
-Then we add a static route saying that our container subnet 21::/80 can be reached the interface WAN6 via the host 20::2.
+Finally we add a static route saying that our container subnet 21::/80 can be reached trough the "vm1" gateway that means trough the interface WAN6 via the host at 20::2.
 
 ![pfSense bridge](images/pfsense_static_routes.png)
 
 
 ### MAC assignment for IPv6
 
-Our hosting provider requires that our IPv6 traffic comes from the same MAC address associated with one of our IPv4:
+Our hosting provider requires that our IPv6 traffic comes from the same MAC address associated with one of our IPv4, in this case its the extra NAT IPv4.
 
 ![pfSense bridge](images/hetzner_ipv6.png)
 
@@ -161,10 +162,9 @@ We configure docker to use our /80 subnets under 21::/80.
   "fixed-cidr-v6": "z:x:y:w:21::/80"
 }
 ```
-
-```
 Test it by using an alpine container:
 
+```
 # docker run -it alpine ash
 / # ip -6 route
 z:x:y:w:21::/80 dev eth0  metric 256 
@@ -189,5 +189,5 @@ PING www.google.com (2a00:1450:400e:807::2004): 56 data bytes
 
 ```
 
-From here we can see we got IPv4 172.17.0.2/16 and IPv6 z:x:y:w:21:242:ac11:2/80 and ping with IPv6 works.
+From here we can see we got z:x:y:w:21:242:ac11:2/80 and ping to google works.
 
