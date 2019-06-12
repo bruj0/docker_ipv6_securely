@@ -189,5 +189,5 @@ PING www.google.com (2a00:1450:400e:807::2004): 56 data bytes
 
 ```
 
-From here we can see we got z:x:y:w:21:242:ac11:2/80 and ping to google works.
+From here we can see we got z:.x:y:w:21:242:ac11:2/80 and ping to google works.
 
